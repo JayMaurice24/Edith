@@ -12,6 +12,8 @@ import Keyboard.Arrows
 import Keyboard exposing (subscriptions)
 import Platform.Cmd as Cmd
 import String exposing (slice)
+import Html exposing (aside)
+import Html.Attributes exposing (for)
 
 type alias Model =
     { text : String
@@ -35,7 +37,7 @@ init _ =
     }, Cmd.none)
 type Msg
     = UpdateInput String
-    | MoveCursor CursorDirection
+    | MoveCursor
     | Key Keyboard.Msg
     {-
     | SelectText Int
@@ -54,118 +56,36 @@ update msg model =
     case msg of 
         UpdateInput nText ->  
                 ({model | text = nText}, Cmd.none)
-        MoveCursor direction -> 
-            (model 
-                |> (\m -> {m | cursorPos = moveCursor m.cursorPos direction m.text})
-            , Cmd.none
-            )
+        MoveCursor -> 
+            (model, Cmd.none)
 
         Key keyMsg ->
             let
                  k = Keyboard.update keyMsg []
     
             in case k of
-                [ArrowDown] -> ({model | cursorPos = model.cursorPos + 120 }, Cmd.none)
-                [ArrowRight] ->  ({model | cursorPos = model.cursorPos - 120 }, Cmd.none)
-                [ArrowLeft] ->  ({model | cursorPos = model.cursorPos - 1}, Cmd.none)
-                [ArrowUp] ->  ({model | cursorPos = model.cursorPos + 1}, Cmd.none)
-                [Character ch] ->  ({model | text = model.text ++ ch}, Cmd.none)
-                [Spacebar] -> ({model | text = model.text ++ " " }, Cmd.none)
+                [ArrowDown] -> (Debug.log "hi" {model | cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos + 120)}, Cmd.none)
+                [ArrowRight] ->  (Debug.log "hi" {model |cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos + 1) }, Cmd.none)
+                [ArrowLeft] ->  (Debug.log "hi" {model |cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos - 1 )}, Cmd.none)
+                [ArrowUp] ->  (Debug.log "hi" {model | cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos - 120)}, Cmd.none)
+                [Character ch] ->  (Debug.log "hi" {model | text = writeFrom model.text ch model.cursorPos, cursorPos = model.cursorPos + 1}, Cmd.none)
+                [Spacebar] -> (Debug.log "hi" {model | text = writeFrom model.text " " model.cursorPos, cursorPos = model.cursorPos + 1 }, Cmd.none)
+                [Backspace] -> (Debug.log "hi" {model | text = deleteText model.text model.cursorPos, cursorPos = model.cursorPos - 1 }, Cmd.none)
                 [] ->  (model, Cmd.none)
                 _ ->  (model, Cmd.none)
             
 
 
-moveCursor : Int -> CursorDirection -> String -> Int 
-moveCursor currPos direction text = 
-    let
-        lns = String.lines text
-        (row, col) = getCursorRowAndCol text currPos 
-    in case direction of 
-        Left -> 
-            if col > 0 then 
-                currPos - 1 
-            else if row > 0 then
-                let 
-                    prev = 
-                        case List.drop (row - 1 ) lns of 
-                            [] -> ""
-                            line :: _ -> ""          
-                in
-                currPos - 1 - String.length prev
-            else 
-                currPos
-        Right -> 
-            let
-                currLine = 
-                    case List.drop row lns of 
-                    [] -> 
-                        case lns |> List.reverse |> List.head of 
-                            Just last -> last 
-                            Nothing -> ""
-                    next :: _ -> next
-            in
-            if col < String.length currLine then 
-                currPos + 1 
-            else if row < List.length lns - 1 then 
-                currPos + 1 + String.length (
-                    case List.drop (row + 1) lns of 
-                        [] -> ""
-                        line :: _ -> line)
-            else 
-                currPos
-
-        Up -> 
-            if row > 0 then 
-                let
-                    prev = 
-                        case List.drop (row - 1 ) lns of 
-                            [] -> ""
-                            line :: _ -> line
-                            
-                    newCol = min col (String.length prev)
-                in
-                currPos - col + newCol
-            else 
-                currPos
-        Down -> 
-            if row < List.length lns - 1 then 
-                let
-                    next =
-                        case List.drop (row + 1) lns of 
-                            [] -> ""
-                            line :: _ ->  line
-  
-                    newCol = min col (String.length next)    
-                in
-                currPos +  String.length (
-                        case List.drop (row + 1) lns of 
-                            [] -> ""
-                            line :: _ -> line)
-                
-                     + newCol
-            else 
-                currPos
-        None -> 
-            currPos
-getCursorRowAndCol : String -> Int -> (Int, Int)
-getCursorRowAndCol text cursorPos = 
+moveCursor : Int -> String -> String 
+moveCursor index text =
     let 
-        lns = String.lines text 
-        (row, col) = 
-            case List.drop cursorPos lns of 
-                [] -> 
-                    ( case lns |> List.reverse |> List.head of 
-                        Just lastline -> List.length lns - 1
-                        Nothing -> 0
-                    , String.length (case List.head (List.drop (cursorPos - 1) lns) of 
-                                Just l -> l
-                                Nothing -> "")
-                    )
-                next :: _ -> (cursorPos + 1, 0) 
+        before = 
+            String.left index text
+        
+        after = 
+            String.dropLeft index text
     in 
-    (row, col) 
-
+    String.join (before ++ "|") [after] 
 
 view : Model -> Html Msg
 view model =
@@ -176,7 +96,7 @@ view model =
             [text (formatText model)]
         ]
 
-formatText : Model -> String 
+formatText : Model -> String
 formatText model =
     let 
         lines = 
@@ -189,8 +109,48 @@ formatText model =
             ("", 0) 
             model.text
     in case lines of 
-        (formatted, _) -> formatted 
+        (formatted, _ ) -> (formatted |> insertCursor) model.cursorPos
+        
+insertCursor : String  -> Int -> String 
+insertCursor text cursorPos = 
+    String.left cursorPos text ++ "|" ++ String.dropLeft cursorPos text 
 
+splitText : String -> List String 
+splitText inputString = 
+    let
+        wordsList =
+            String.words inputString
+
+        (wrappedLines, currLine) =
+            List.foldl (\word (lines, currentLine) ->
+                let
+                    newLine =
+                        currentLine ++ " " ++ word
+                in
+                if String.length newLine <= 120 then
+                    (lines, newLine)
+                else
+                    (lines ++ [currentLine], word)
+            ) ([], "") wordsList
+    in
+    wrappedLines ++ [currLine]
+writeFrom : String -> String ->Int -> String 
+writeFrom text c index = 
+    String.left index text ++ c ++ String.dropLeft index text 
+
+deleteText : String -> Int -> String
+deleteText text index = 
+    String.left (index - 1) text ++ String.dropLeft index text 
+    
+
+verifyRange : comparable -> comparable -> comparable -> comparable
+verifyRange min max value = 
+    if value < min then 
+        min 
+    else if value > max then 
+        max
+    else 
+        value    
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.map Key Keyboard.subscriptions
