@@ -1,32 +1,42 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, div, input, button, text, textarea, code)
+import Html exposing (Html, div, input, button, text, textarea, code, pre)
 import Html.Attributes exposing (placeholder, style,value, cols, rows)
 import Html.Events exposing (onClick, onInput, on)
 import String exposing (lines)
 import Json.Decode as Decode
 import Browser.Navigation exposing (Key)
+import Keyboard exposing (Key(..))
+import Keyboard.Arrows
+import Keyboard exposing (subscriptions)
+import Platform.Cmd as Cmd
+import String exposing (slice)
 
 type alias Model =
     { text : String
     , cursorPos : Int
+    , lineNum : Int
     , lines : List Int
     , selectionStart : Maybe Int
     , selectionEnd : Maybe Int
+    , keys : List Key
     }
 
-init : Model
-init =
-    { text = ""
+init : () -> (Model, Cmd Msg)
+init _ =
+    ({ text = ""
     , cursorPos = 0
     , lines = []
+    , lineNum = 1 
+    , keys = []
     , selectionStart = Nothing
     , selectionEnd = Nothing
-    }
+    }, Cmd.none)
 type Msg
     = UpdateInput String
     | MoveCursor CursorDirection
+    | Key Keyboard.Msg
     {-
     | SelectText Int
     | DeleteSelectedText
@@ -39,20 +49,33 @@ type CursorDirection
     | Down
     | None
 
-update: Msg -> Model -> Model 
+update: Msg -> Model -> (Model, Cmd Msg)
 update msg model = 
     case msg of 
-        UpdateInput nText -> 
-            let
-                updatedModel = {model | text = nText}
-                updatedLines = splitLine 120 updatedModel.text
-            in
-            {updatedModel | lines = List.range 1 (List.length updatedLines)}
-        
+        UpdateInput nText ->  
+                ({model | text = nText}, Cmd.none)
         MoveCursor direction -> 
-            model 
+            (model 
                 |> (\m -> {m | cursorPos = moveCursor m.cursorPos direction m.text})
-                |> updateLineNum
+            , Cmd.none
+            )
+
+        Key keyMsg ->
+            let
+                 k = Keyboard.update keyMsg []
+    
+            in case k of
+                [ArrowDown] -> ({model | cursorPos = model.cursorPos + 120 }, Cmd.none)
+                [ArrowRight] ->  ({model | cursorPos = model.cursorPos - 120 }, Cmd.none)
+                [ArrowLeft] ->  ({model | cursorPos = model.cursorPos - 1}, Cmd.none)
+                [ArrowUp] ->  ({model | cursorPos = model.cursorPos + 1}, Cmd.none)
+                [Character ch] ->  ({model | text = model.text ++ ch}, Cmd.none)
+                [Spacebar] -> ({model | text = model.text ++ " " }, Cmd.none)
+                [] ->  (model, Cmd.none)
+                _ ->  (model, Cmd.none)
+            
+
+
 moveCursor : Int -> CursorDirection -> String -> Int 
 moveCursor currPos direction text = 
     let
@@ -144,60 +167,34 @@ getCursorRowAndCol text cursorPos =
     (row, col) 
 
 
-splitText : Int -> String -> List String
-splitText maxLineLength text =
-    String.split "\n" text
-        |> List.concatMap (splitLine maxLineLength)
-
-splitLine : Int -> String -> List String
-splitLine maxLineLength line =
-    case String.slice 0 maxLineLength line of
-        "" ->
-            []
-
-        chunk ->
-            chunk :: splitLine maxLineLength (String.dropLeft (String.length chunk) line) 
-
-lineNumber : String -> List Int 
-lineNumber text = 
-    String.lines text 
-        |> List.indexedMap (\i _ -> i+1)
-
-updateLineNum : Model -> Model 
-updateLineNum model = 
-    {model | lines = lineNumber model.text}
-
 view : Model -> Html Msg
 view model =
     div []
-        [ div [ style "display" "flex", style "flex-direction" "row", style "padding" "10px" ]
-            [ div [] (List.map (\num -> div [] [ text (String.fromInt num) ]) model.lines), div [] [ text (getVisibleText model)
+        [ pre
+            [ style "padding" "10px"
             ]
-        , input [ placeholder "Type your text", onInput UpdateInput, on "keyDown" keyDecoder ] []
-        ]]
+            [text (formatText model)]
+        ]
 
-getVisibleText : Model ->   String
-getVisibleText model =
-    let
-        lines = splitText 120 model.text
-        (row, col) = getCursorRowAndCol model.text model.cursorPos
-        indicator = if col >= 0 then String.repeat col " " ++ "|" else ""
-    in
-    String.join "\n" (List.indexedMap (\i line -> if i == row then line ++ indicator else line) lines)
+formatText : Model -> String 
+formatText model =
+    let 
+        lines = 
+            String.foldl (\c (formatted,count) -> 
+                if count < 120 then 
+                    (formatted ++ String.fromChar c, count + 1 )
+                else 
+                    (formatted ++ "\n" ++ String.fromChar c, 1)
+            )
+            ("", 0) 
+            model.text
+    in case lines of 
+        (formatted, _) -> formatted 
 
-keyDecoder : Decode.Decoder Msg 
-keyDecoder = 
-    Decode.map toKey (Decode.field "key" Decode.string)
-
-toKey : String -> Msg
-toKey keyValue = 
-    case keyValue of 
-        "ArrowLeft" -> MoveCursor Left
-        "ArrowRight" -> MoveCursor Right 
-        "ArrowDown" -> MoveCursor Down 
-        "ArrowUp"   -> MoveCursor Up 
-        _ -> MoveCursor None
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.map Key Keyboard.subscriptions
 
 main : Program () Model Msg 
 main = 
-    Browser.sandbox {init = init, update = update, view = view}
+    Browser.element {init = init, update = update, view = view, subscriptions = subscriptions}
