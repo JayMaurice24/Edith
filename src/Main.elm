@@ -210,8 +210,8 @@ view model =
 
     Just content ->
         div []
-            [   button [ onClick CsvRequested ] [ text "Open" ]
-                ,button [ onClick Download ] [ text "Save" ]
+            [   button [ onClick CsvRequested ] [ text "Upload File" ]
+                ,button [ onClick Download ] [ text "Download File" ]
                 ,pre
                 [ style "padding" "10px"
                 ]
