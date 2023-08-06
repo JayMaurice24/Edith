@@ -136,7 +136,7 @@ view model =
 
 
     Just content ->
-        div [style "padding" "20px"]
+        div [style "padding" "20px", style "background" "black", style "color" "white"]
             [   button  [onClick CsvRequested ] [ text "Upload" ]
                 ,button [ onClick Download ] [ text "Download" ]
                 ,pre
