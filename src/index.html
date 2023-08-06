@@ -5820,6 +5820,18 @@ var $elm$file$File$Select$file = F2(
 			toMsg,
 			_File_uploadOne(mimes));
 	});
+var $author$project$Main$verifyRange = F3(
+	function (min, max, value) {
+		return (_Utils_cmp(value, min) < 0) ? min : ((_Utils_cmp(value, max) > 0) ? max : value);
+	});
+var $author$project$Main$moveCursor = F2(
+	function (text, pos) {
+		return A3(
+			$author$project$Main$verifyRange,
+			0,
+			$elm$core$String$length(text) + (($elm$core$String$length(text) / 120) | 0),
+			pos);
+	});
 var $elm$file$File$Download$string = F3(
 	function (name, mime, content) {
 		return A2(
@@ -5828,6 +5840,7 @@ var $elm$file$File$Download$string = F3(
 			A3(_File_download, name, mime, content));
 	});
 var $elm$file$File$toString = _File_toString;
+var $elm$core$String$toUpper = _String_toUpper;
 var $ohanhi$keyboard$Keyboard$Backspace = {$: 'Backspace'};
 var $ohanhi$keyboard$Keyboard$Clear = {$: 'Clear'};
 var $ohanhi$keyboard$Keyboard$Copy = {$: 'Copy'};
@@ -6212,7 +6225,6 @@ var $ohanhi$keyboard$Keyboard$anyKeyWith = function (charParser) {
 var $ohanhi$keyboard$Keyboard$Character = function (a) {
 	return {$: 'Character', a: a};
 };
-var $elm$core$String$toUpper = _String_toUpper;
 var $ohanhi$keyboard$Keyboard$characterKeyUpper = function (_v0) {
 	var value = _v0.a;
 	return ($elm$core$String$length(value) === 1) ? $elm$core$Maybe$Just(
@@ -6272,22 +6284,34 @@ var $ohanhi$keyboard$Keyboard$updateWithParser = F3(
 		}
 	});
 var $ohanhi$keyboard$Keyboard$update = $ohanhi$keyboard$Keyboard$updateWithParser($ohanhi$keyboard$Keyboard$anyKeyUpper);
+var $elm$core$Basics$modBy = _Basics_modBy;
+var $author$project$Main$updateCursor = F2(
+	function (text, cursor) {
+		return (!A2(
+			$elm$core$Basics$modBy,
+			120,
+			$elm$core$String$length(text))) ? (cursor + 2) : (cursor + 1);
+	});
 var $elm$core$String$lines = _String_lines;
-var $author$project$Main$updateLineNum = function (model) {
+var $author$project$Main$updateLines = function (model) {
 	return _Utils_update(
 		model,
 		{
-			lineNums: A2(
-				$elm$core$List$range,
-				1,
-				$elm$core$List$length(
-					$elm$core$String$lines(model.text)))
+			lineNums: A2($elm$core$List$range, 1, model.lineNum)
 		});
 };
-var $author$project$Main$verifyRange = F3(
-	function (min, max, value) {
-		return (_Utils_cmp(value, min) < 0) ? min : ((_Utils_cmp(value, max) > 0) ? max : value);
-	});
+var $author$project$Main$updateLineNum = function (model) {
+	var line = $elm$core$List$length(
+		$elm$core$String$lines(model.text));
+	var l = ($elm$core$String$length(model.text) / 120) | 0;
+	var newLine = (_Utils_cmp(l + line, l) > 0) ? (line + l) : line;
+	return $author$project$Main$updateLines(
+		function (m) {
+			return _Utils_update(
+				m,
+				{lineNum: newLine});
+		}(model));
+};
 var $author$project$Main$writeFrom = F3(
 	function (text, c, index) {
 		return _Utils_ap(
@@ -6299,13 +6323,6 @@ var $author$project$Main$writeFrom = F3(
 var $author$project$Main$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
-			case 'UpdateInput':
-				var text = msg.a;
-				return _Utils_Tuple2(
-					$author$project$Main$updateLineNum(model),
-					$elm$core$Platform$Cmd$none);
-			case 'MoveCursor':
-				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 			case 'Key':
 				var keyMsg = msg.a;
 				var k = A2($ohanhi$keyboard$Keyboard$update, keyMsg, _List_Nil);
@@ -6320,11 +6337,7 @@ var $author$project$Main$update = F2(
 										_Utils_update(
 											model,
 											{
-												cursorPos: A3(
-													$author$project$Main$verifyRange,
-													0,
-													$elm$core$String$length(model.text),
-													model.cursorPos + 120)
+												cursorPos: A2($author$project$Main$moveCursor, model.text, model.cursorPos + 120)
 											}),
 										$elm$core$Platform$Cmd$none);
 								case 'ArrowRight':
@@ -6333,11 +6346,7 @@ var $author$project$Main$update = F2(
 										_Utils_update(
 											model,
 											{
-												cursorPos: A3(
-													$author$project$Main$verifyRange,
-													0,
-													$elm$core$String$length(model.text),
-													model.cursorPos + 1)
+												cursorPos: A2($author$project$Main$moveCursor, model.text, model.cursorPos + 1)
 											}),
 										$elm$core$Platform$Cmd$none);
 								case 'ArrowLeft':
@@ -6346,11 +6355,7 @@ var $author$project$Main$update = F2(
 										_Utils_update(
 											model,
 											{
-												cursorPos: A3(
-													$author$project$Main$verifyRange,
-													0,
-													$elm$core$String$length(model.text),
-													model.cursorPos - 1)
+												cursorPos: A2($author$project$Main$moveCursor, model.text, model.cursorPos - 1)
 											}),
 										$elm$core$Platform$Cmd$none);
 								case 'ArrowUp':
@@ -6359,11 +6364,7 @@ var $author$project$Main$update = F2(
 										_Utils_update(
 											model,
 											{
-												cursorPos: A3(
-													$author$project$Main$verifyRange,
-													0,
-													$elm$core$String$length(model.text),
-													model.cursorPos - 120)
+												cursorPos: A2($author$project$Main$moveCursor, model.text, model.cursorPos - 120)
 											}),
 										$elm$core$Platform$Cmd$none);
 								case 'Character':
@@ -6374,7 +6375,7 @@ var $author$project$Main$update = F2(
 												return _Utils_update(
 													m,
 													{
-														cursorPos: m.cursorPos + 1,
+														cursorPos: A2($author$project$Main$updateCursor, m.text, m.cursorPos),
 														text: A3($author$project$Main$writeFrom, m.text, ch, m.cursorPos)
 													});
 											}(model)),
@@ -6382,12 +6383,15 @@ var $author$project$Main$update = F2(
 								case 'Spacebar':
 									var _v6 = k.a;
 									return _Utils_Tuple2(
-										_Utils_update(
-											model,
-											{
-												cursorPos: model.cursorPos + 1,
-												text: A3($author$project$Main$writeFrom, model.text, ' ', model.cursorPos)
-											}),
+										$author$project$Main$updateLineNum(
+											function (m) {
+												return _Utils_update(
+													m,
+													{
+														cursorPos: A2($author$project$Main$updateCursor, m.text, m.cursorPos),
+														text: A3($author$project$Main$writeFrom, m.text, ' ', m.cursorPos)
+													});
+											}(model)),
 										$elm$core$Platform$Cmd$none);
 								case 'Backspace':
 									var _v7 = k.a;
@@ -6395,20 +6399,23 @@ var $author$project$Main$update = F2(
 										_Utils_update(
 											model,
 											{
-												cursorPos: model.cursorPos - 1,
+												cursorPos: A2($author$project$Main$moveCursor, model.text, model.cursorPos - 1),
 												text: A2($author$project$Main$deleteText, model.text, model.cursorPos)
 											}),
 										$elm$core$Platform$Cmd$none);
 								case 'Enter':
 									var _v8 = k.a;
 									return _Utils_Tuple2(
-										_Utils_update(
-											model,
-											{
-												cursorPos: model.cursorPos + 1,
-												lineNum: model.lineNum + 1,
-												text: A3($author$project$Main$writeFrom, model.text, '\n', model.cursorPos)
-											}),
+										$author$project$Main$updateLineNum(
+											function (m) {
+												return _Utils_update(
+													m,
+													{
+														cursorPos: m.cursorPos + 1,
+														lineNum: m.lineNum + 1,
+														text: A3($author$project$Main$writeFrom, m.text, '\n', m.cursorPos)
+													});
+											}(model)),
 										$elm$core$Platform$Cmd$none);
 								default:
 									break _v1$9;
@@ -6447,7 +6454,9 @@ var $author$project$Main$update = F2(
 					_Utils_update(
 						model,
 						{
-							csv: $elm$core$Maybe$Just(content)
+							text: _Utils_ap(
+								$elm$core$String$toUpper(content),
+								model.text)
 						}),
 					$elm$core$Platform$Cmd$none);
 		}
@@ -6472,11 +6481,17 @@ var $author$project$Main$formatText = function (model) {
 			function (c, _v1) {
 				var formatted = _v1.a;
 				var count = _v1.b;
-				return (count < 120) ? _Utils_Tuple2(
+				return ($elm$core$String$fromChar(c) === '\n') ? _Utils_Tuple2(
 					_Utils_ap(
 						formatted,
 						$elm$core$String$fromChar(c)),
-					count + 1) : _Utils_Tuple2(formatted + '\n', 0);
+					1) : ((count < 120) ? _Utils_Tuple2(
+					_Utils_ap(
+						formatted,
+						$elm$core$String$fromChar(c)),
+					count + 1) : _Utils_Tuple2(
+					formatted + ('\n' + $elm$core$String$fromChar(c)),
+					1));
 			}),
 		_Utils_Tuple2('', 0),
 		model.text);
@@ -6510,7 +6525,10 @@ var $author$project$Main$view = function (model) {
 	if (_v0.$ === 'Nothing') {
 		return A2(
 			$elm$html$Html$div,
-			_List_Nil,
+			_List_fromArray(
+				[
+					A2($elm$html$Html$Attributes$style, 'padding', '20px')
+				]),
 			_List_fromArray(
 				[
 					A2(
@@ -6521,7 +6539,7 @@ var $author$project$Main$view = function (model) {
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Open')
+							$elm$html$Html$text('Upload')
 						])),
 					A2(
 					$elm$html$Html$button,
@@ -6531,7 +6549,7 @@ var $author$project$Main$view = function (model) {
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Save')
+							$elm$html$Html$text('Download')
 						])),
 					A2(
 					$elm$html$Html$pre,
@@ -6584,7 +6602,10 @@ var $author$project$Main$view = function (model) {
 		var content = _v0.a;
 		return A2(
 			$elm$html$Html$div,
-			_List_Nil,
+			_List_fromArray(
+				[
+					A2($elm$html$Html$Attributes$style, 'padding', '20px')
+				]),
 			_List_fromArray(
 				[
 					A2(
@@ -6595,7 +6616,7 @@ var $author$project$Main$view = function (model) {
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Upload File')
+							$elm$html$Html$text('Upload')
 						])),
 					A2(
 					$elm$html$Html$button,
@@ -6605,7 +6626,7 @@ var $author$project$Main$view = function (model) {
 						]),
 					_List_fromArray(
 						[
-							$elm$html$Html$text('Download File')
+							$elm$html$Html$text('Download')
 						])),
 					A2(
 					$elm$html$Html$pre,

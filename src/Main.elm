@@ -1,14 +1,14 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, div, input, button, text, textarea, code, pre)
-import Html.Attributes exposing (placeholder, style,value, cols, rows)
-import Html.Events exposing (onClick, onInput, on)
+import Html exposing (Html, div, button, text, pre)
+import Html.Attributes exposing (style,value)
+import Html.Events exposing (onClick)
 import String exposing (lines)
-import Json.Decode as Decode
 import Browser.Navigation exposing (Key)
 import Keyboard exposing (Key(..))
 import Keyboard.Arrows
+import Basics exposing (modBy)
 import Keyboard exposing (subscriptions)
 import Platform.Cmd as Cmd
 import String exposing (slice)
@@ -45,14 +45,13 @@ init _ =
     , csv = Nothing
     }, Cmd.none)
 type Msg
-    = UpdateInput String
-    | MoveCursor
-    | Key Keyboard.Msg
+    = 
+    Key Keyboard.Msg
     | CsvRequested
     | CsvSelected File
     | CsvLoaded String
     | Download 
-    {-
+{-
     | SelectText Int
     | DeleteSelectedText
     | ReplaceSelectedText String-}
@@ -67,47 +66,47 @@ type CursorDirection
 update: Msg -> Model -> (Model, Cmd Msg)
 update msg model = 
     case msg of 
-        UpdateInput text->  
-                (updateLineNum model, Cmd.none)
-        MoveCursor -> 
-            (model, Cmd.none)
-
         Key keyMsg ->
             let
                  k = Keyboard.update keyMsg []
     
             in case k of
                 [ArrowDown] -> ({model | 
-                                                        cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos + 120)}
-                                                        , Cmd.none)
+                                        cursorPos = moveCursor model.text (model.cursorPos + 120)}
+                                        , Cmd.none)
                 [ArrowRight] ->  ({model |
-                                                        cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos + 1) }
-                                                        , Cmd.none)
+                                        cursorPos = moveCursor model.text (model.cursorPos + 1) }
+                                        , Cmd.none)
                 [ArrowLeft] ->  ({model |
-                                                        cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos - 1 )}
-                                                        , Cmd.none)
+                                        cursorPos = moveCursor model.text (model.cursorPos - 1 )}
+                                        , Cmd.none)
                 [ArrowUp] ->  ({model | 
-                                                        cursorPos = verifyRange 0 (String.length model.text) (model.cursorPos - 120)} 
-                                                        , Cmd.none)
+                                        cursorPos = moveCursor model.text (model.cursorPos - 120)} 
+                                        , Cmd.none)
                 [Character ch] ->  (((model 
-                                                        |> (\m -> {m| 
-                                                        text = writeFrom m.text ch m.cursorPos
-                                                        , cursorPos = m.cursorPos + 1
-                                                        })
-                                                        |> updateLineNum)), Cmd.none)
-                [Spacebar] -> ({model | 
-                                                        text = writeFrom model.text " " model.cursorPos, cursorPos = model.cursorPos + 1}
-                                                        , Cmd.none)
+                                            |> (\m -> {m| 
+                                            text = writeFrom m.text ch m.cursorPos
+                                            , cursorPos = updateCursor m.text m.cursorPos
+                                            })
+                                            |> updateLineNum)), Cmd.none)
+                [Spacebar] -> (((model 
+                                        |> (\m -> {m| 
+                                        text = writeFrom m.text " " m.cursorPos
+                                        , cursorPos = updateCursor m.text m.cursorPos
+                                        })
+                                        |> updateLineNum)), Cmd.none)
                 [Backspace] -> ({model | 
-                                                        text = deleteText model.text model.cursorPos, cursorPos = model.cursorPos - 1 }
-                                                        , Cmd.none)
-                [Enter] ->  ({model | 
-                                                        text = writeFrom model.text "\n" model.cursorPos, cursorPos = model.cursorPos + 1
-                                                        ,lineNum = model.lineNum + 1  
-                                                        }
-                                                        , Cmd.none)
+                                            text = deleteText model.text model.cursorPos, cursorPos = moveCursor model.text (model.cursorPos - 1)}
+                                            , Cmd.none)
+                [Enter] ->  (((model 
+                                    |> (\m -> {m | 
+                                    text = writeFrom m.text "\n" m.cursorPos, cursorPos = m.cursorPos + 1
+                                    ,lineNum = m.lineNum + 1 
+                                    })
+                                    |> updateLineNum)), Cmd.none)
                 [] ->  (model, Cmd.none)
                 _ ->  (model, Cmd.none) 
+                
         Download -> 
                     (model, Download.string "download.txt" "text/markdown" model.text)
         CsvRequested ->
@@ -121,30 +120,18 @@ update msg model =
                     )
 
         CsvLoaded content ->
-                    ( { model | csv = Just content }
+                    ( { model | text = String.toUpper content ++ model.text}
                     , Cmd.none
                     )
-                    
-
-
-moveCursor : Int -> String -> String 
-moveCursor index text =
-    let 
-        before = 
-            String.left index text
-        
-        after = 
-            String.dropLeft index text
-    in 
-    String.join (before ++ "|") [after] 
+                     
 
 view : Model -> Html Msg
 view model =
   case model.csv of
     Nothing ->
-        div []
-            [   button [ onClick CsvRequested ] [ text "Open" ]
-                ,button [ onClick Download ] [ text "Save" ]
+        div [style "padding" "20px"]
+            [   button [ onClick CsvRequested ] [ text "Upload" ]
+                ,button [ onClick Download ] [ text "Download" ]
                 ,pre
             [ style "padding" "10px"
             ][
@@ -154,44 +141,46 @@ view model =
 
 
     Just content ->
-        div []
-            [   button [ onClick CsvRequested ] [ text "Upload File" ]
-                ,button [ onClick Download ] [ text "Download File" ]
+        div [style "padding" "20px"]
+            [   button  [onClick CsvRequested ] [ text "Upload" ]
+                ,button [ onClick Download ] [ text "Download" ]
                 ,pre
             [ style "padding" "10px"
             ][
             div [style "display" "flex", style "flex-direction" "row"][
                 div [style "margin-right" "10px"] (List.map (\num -> div [] [ text (String.fromInt num) ]) model.lineNums), div [] [text (formatText model)]]
             ]]
-                --[text (String.append model.text content)]
-formatText : Model -> String
+formatText : Model -> String -- function to wrap text and keep line to a max of 120 characters 
 formatText model =
     let 
         lines = 
             String.foldl (\c (formatted,count) -> 
-                if count < 120 then 
+                if (String.fromChar c == "\n") then 
+                    (formatted ++ String.fromChar c, 1)
+                else if count < 120 then 
                     (formatted ++ String.fromChar c, count + 1 )
+     
                 else 
-                    (formatted ++ "\n", 0)
+                    (formatted ++"\n" ++ String.fromChar c , 1)
             )
             ("", 0) 
             model.text
     in case lines of 
         (formatted, _ ) -> (formatted |> insertCursor) (model.cursorPos) 
-        
-insertCursor : String  -> Int -> String 
+
+insertCursor : String  -> Int -> String --inserts cursor to text 
 insertCursor text cursorPos = 
     String.left cursorPos text ++ "|" ++ String.dropLeft cursorPos text 
 
-writeFrom : String -> String ->Int -> String 
+writeFrom : String -> String ->Int -> String --adds text from cursor position
 writeFrom text c index = 
     String.left index text ++ c ++ String.dropLeft index text 
 
-deleteText : String -> Int -> String
+deleteText : String -> Int -> String --detelets text but dropping the letter/character at an index
 deleteText text index =
     String.left (index - 1) text ++ String.dropLeft index text 
     
-verifyRange : comparable -> comparable -> comparable -> comparable
+verifyRange : Int -> Int -> Int -> Int --Ensures the cursor is within bounds of the text 
 verifyRange min max value = 
     if value < min then 
         min 
@@ -199,11 +188,36 @@ verifyRange min max value =
         max
     else 
         value    
-updateLineNum : Model ->Model
-updateLineNum model = 
-    { model | lineNums = List.range 1 (List.length (String.lines model.text))}
 
-    
+updateLineNum : Model -> Model --Lines are either updated base on character length for wrapped text and \n characters for new lines 
+updateLineNum model = 
+    let
+        line = List.length (String.lines model.text) --
+        l = ((String.length model.text) // 120)
+        newLine =
+            if ((l + line) > l) then --this is to ensure that when someone has pressed enter multiple times but the characters are still below 120, we don't have too many line numbers 
+                line + l
+            else
+                line
+    in model 
+            |>(\m -> ({ m | lineNum = newLine}))
+            |> updateLines
+
+moveCursor: String -> Int -> Int
+moveCursor text pos = 
+    verifyRange 0 (String.length text + ((String.length text) // 120)) (pos)
+
+updateCursor: String -> Int -> Int --the format text adds one to the count when adding a \n, so cursor position needs to be doubled to account for that)
+updateCursor text cursor = 
+    if (modBy 120 (String.length text) == 0) then
+        cursor + 2 
+    else 
+        cursor + 1 
+
+
+updateLines : Model -> Model --updates the list or range of lines after having updated the number of lines 
+updateLines model = 
+    {model | lineNums = List.range 1 model.lineNum }
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
