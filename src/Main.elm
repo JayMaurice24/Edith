@@ -7,15 +7,10 @@ import Html.Events exposing (onClick)
 import String exposing (lines)
 import Browser.Navigation exposing (Key)
 import Keyboard exposing (Key(..))
-import Keyboard.Arrows
 import Basics exposing (modBy)
 import Keyboard exposing (subscriptions)
 import Platform.Cmd as Cmd
-import String exposing (slice)
-import Html exposing (aside)
-import Html.Attributes exposing (for)
 import Keyboard exposing (update)
-import List exposing (map)
 import File exposing (File)
 import File.Select as Select
 import Task
@@ -129,7 +124,7 @@ view : Model -> Html Msg
 view model =
   case model.csv of
     Nothing ->
-        div [style "padding" "20px"]
+        div [style "padding" "20px", style "background" "black", style "color" "white"]
             [   button [ onClick CsvRequested ] [ text "Upload" ]
                 ,button [ onClick Download ] [ text "Download" ]
                 ,pre
