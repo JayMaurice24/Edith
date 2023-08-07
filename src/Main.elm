@@ -26,7 +26,6 @@ type alias Model =
     , selectionEnd : Int
     , shiftKey : Bool  
     , selectionStart : Int
-    , keys : List Key
     , csv : Maybe String
     }
 
@@ -36,7 +35,6 @@ init _ =
     , cursorPos = 0
     , lineNums = []
     , lineNum = 1 
-    , keys = []
     , shiftKey = False
     , selectionEnd = 0
     , selectionStart = 0 
