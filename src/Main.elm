@@ -7,7 +7,7 @@ import Html.Events exposing (onClick)
 import String exposing (lines)
 import Browser.Navigation exposing (Key)
 import Keyboard exposing (Key(..))
-import Basics exposing (modBy)
+import Basics exposing (modBy, not)
 import Keyboard exposing (subscriptions)
 import Platform.Cmd as Cmd
 import Keyboard exposing (update)
@@ -25,6 +25,7 @@ type alias Model =
     , select: Bool 
     , lineNums: List Int
     , selectionEnd : Int
+    , shiftKey : Bool  
     , selectionStart : Int
     , selected : String 
     , keys : List Key
@@ -40,6 +41,7 @@ init _ =
     , selected = ""
     , select = False
     , keys = []
+    , shiftKey = False
     , selectionEnd = 0
     , selectionStart = 0 
     , csv = Nothing
@@ -67,36 +69,31 @@ update: Msg -> Model -> (Model, Cmd Msg)
 update msg model = 
     case msg of 
         Key keyMsg ->
-                if (List.head (List.reverse model.keys)) == Just Shift then
-                let
-                    updatedModel =
-                        let
-                            k = Keyboard.update keyMsg []
-                            start = model.cursorPos
-                            end = model.cursorPos + 1
-                            left = startSelection model.text start --splits the left and adds [
-                            right = endSelection model.text (moveCursor model.text 1) -- takes the right and adds ] in front
-                        in
-                        case k of
-                            ArrowRight :: _ ->
-                                let
-                                    nRight = switchCharacters (end + 1) right  -- this is supposed to switch out the characters witht the next so ] and whatever comes after it 
-                                    
-                                in
-                                {model | text = left ++ nRight} -- however the result is that it just adds all the strings together maybe find a bettet way to implement this
-                                
-
-                            Enter :: _ ->
-                                { model | cursorPos = moveCursor model.text (model.cursorPos + 120), select = False, keys = List.append model.keys k }
-
-                            _ ->
-                                model
-                in
-                ({ updatedModel | selected = String.slice model.selectionStart model.selectionEnd model.text }, Cmd.none)
-                else 
                 let 
                     k = Keyboard.update keyMsg []
-                in case k of
+                in if model.shiftKey then
+                    case k of  
+                        [ArrowRight]->
+                            if model.selectionStart == model.selectionEnd then 
+                                ({model | selectionStart = model.cursorPos, selectionEnd = model.cursorPos + 1}, Cmd.none) 
+                            else 
+                                ({model | selectionEnd = model.selectionEnd + 1}, Cmd.none) 
+                        [ArrowLeft] ->
+                            if model.selectionStart == model.selectionEnd then 
+                                ({model | selectionStart = model.cursorPos - 1}, Cmd.none) 
+                            else 
+                                ({model | selectionEnd = model.selectionEnd - 1}, Cmd.none)
+                        [Shift] -> ({model | shiftKey = False }, Cmd.none) 
+                        [Delete] -> ({model | text = deleteSelectedText model.selectionStart model.selectionEnd model.text, cursorPos = model.selectionStart, shiftKey = False}, Cmd.none)
+                        [Character ch] ->  ({model | 
+                                                text = replaceSelectedText model.selectionStart model.selectionEnd ch model.text
+                                                , cursorPos = model.selectionStart + 1
+                                                , shiftKey = False 
+                                                }, Cmd.none)
+                        _ -> (model, Cmd.none)
+
+                else 
+                  case k of
                     [ArrowDown] -> (Debug.log "Hi"{model | 
                                             cursorPos = moveCursor model.text (model.cursorPos + 120)}
                                             , Cmd.none)
@@ -110,20 +107,19 @@ update msg model =
                                             cursorPos = moveCursor model.text (model.cursorPos - 120)} 
                                             , Cmd.none)
                     [Shift] ->  (Debug.log "Hi"{model | 
-                                            keys = List.append model.keys k} 
+                                                shiftKey = not model.shiftKey} 
                                             , Cmd.none)
                         
-
                     [Character ch] ->  (Debug.log "Hi"((model 
                                                 |> (\m -> {m| 
                                                 text = writeFrom m.text ch m.cursorPos
-                                                , cursorPos = updateCursor m.text m.cursorPos,  keys = List.append model.keys k
+                                                , cursorPos = updateCursor m.text m.cursorPos
                                                 })
                                                 |> updateLineNum)), Cmd.none)
                     [Spacebar] -> (Debug.log "Hi"((model 
                                             |> (\m -> {m| 
                                             text = writeFrom m.text " " m.cursorPos
-                                            , cursorPos = updateCursor m.text m.cursorPos,  keys = List.append model.keys k
+                                            , cursorPos = updateCursor m.text m.cursorPos
                                             })
                                             |> updateLineNum)), Cmd.none)
                     [Backspace] -> (Debug.log "Hi"{model | 
@@ -199,49 +195,15 @@ formatText model =
             ("", 0) 
             model.text
     in case lines of 
-        (formatted, _ ) -> (formatted |> insertCursor) (model.cursorPos) 
+        (formatted, _ ) -> 
+            if model.shiftKey && model.selectionStart < model.selectionEnd then 
+                String.left model.selectionStart formatted 
+                    ++ "[" ++ String.slice model.selectionStart model.selectionEnd formatted ++ "]"
+                    ++ String.dropLeft model.selectionEnd formatted 
+            else 
+                (formatted |> insertCursor) (model.cursorPos) 
 
-selectText: String -> Int -> Int -> String  
-selectText text start end = 
-    let     
-        right = String.dropLeft start text
-
-        (before, after) = String.slice 0 end right 
-            |> Tuple.pair (String.dropLeft end right)
-    in 
-    before ++ "]" ++ after 
-
-switchCharacters : Int -> String -> String
-switchCharacters index input =
-    if index >= 0 && index < String.length input - 1 then
-        let
-            charAtIndex =
-                String.slice index (index + 1) input
-
-            charAtNextIndex =
-                String.slice (index + 1) (index + 2) input
-        in
-        case (charAtIndex, charAtNextIndex) of
-                (char1, char2) ->
-                    let
-                        beforeIndex =
-                            String.left index input
-
-                        afterIndex =
-                            String.dropLeft (index + 2) input
-                    in
-                    beforeIndex ++ char2 ++ char1 ++ afterIndex
-    else
-        input 
-
-
-
-startSelection :  String -> Int -> String 
-startSelection text start =
-     String.left start text ++ "[" 
-endSelection :  String -> Int -> String 
-endSelection text end =
-     "]"++ String.dropLeft end text   
+ 
 
 insertCursor : String  -> Int -> String --inserts cursor to text 
 insertCursor text cursorPos = 
@@ -253,7 +215,23 @@ writeFrom text c index =
 
 deleteText : String -> Int -> String --detelets text but dropping the letter/character at an index
 deleteText text index =
-    String.left (index - 1) text ++ String.dropLeft index text 
+    String.left (index - 1) text ++ String.dropLeft index text
+
+deleteSelectedText : Int -> Int -> String -> String --deletes selected text when delete is pressed 
+deleteSelectedText start end text =
+    let
+        (before,after) = 
+            (String.slice 0 start text, String.slice end (String.length text) text)          
+    in
+    before ++ after 
+
+replaceSelectedText : Int -> Int -> String -> String -> String --deletes selected text when delete is pressed 
+replaceSelectedText start end ch text =
+    let
+        (before,after) = 
+            (String.slice 0 start text, String.slice end (String.length text) text)          
+    in
+    before ++ ch ++ after 
     
 verifyRange : Int -> Int -> Int -> Int --Ensures the cursor is within bounds of the text 
 verifyRange min max value = 
@@ -298,6 +276,7 @@ updateLines model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.map Key Keyboard.subscriptions
+
 
 main : Program () Model Msg 
 main = 

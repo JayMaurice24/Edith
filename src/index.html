@@ -5355,7 +5355,7 @@ var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $author$project$Main$init = function (_v0) {
 	return _Utils_Tuple2(
-		{csv: $elm$core$Maybe$Nothing, cursorPos: 0, keys: _List_Nil, lineNum: 1, lineNums: _List_Nil, select: false, selected: '', selectionEnd: 0, selectionStart: 0, text: ''},
+		{csv: $elm$core$Maybe$Nothing, cursorPos: 0, keys: _List_Nil, lineNum: 1, lineNums: _List_Nil, select: false, selected: '', selectionEnd: 0, selectionStart: 0, shiftKey: false, text: ''},
 		$elm$core$Platform$Cmd$none);
 };
 var $author$project$Main$Key = function (a) {
@@ -5803,24 +5803,24 @@ var $author$project$Main$CsvLoaded = function (a) {
 var $author$project$Main$CsvSelected = function (a) {
 	return {$: 'CsvSelected', a: a};
 };
-var $ohanhi$keyboard$Keyboard$Shift = {$: 'Shift'};
-var $elm$core$List$append = F2(
-	function (xs, ys) {
-		if (!ys.b) {
-			return xs;
-		} else {
-			return A3($elm$core$List$foldr, $elm$core$List$cons, ys, xs);
-		}
+var $author$project$Main$deleteSelectedText = F3(
+	function (start, end, text) {
+		var _v0 = _Utils_Tuple2(
+			A3($elm$core$String$slice, 0, start, text),
+			A3(
+				$elm$core$String$slice,
+				end,
+				$elm$core$String$length(text),
+				text));
+		var before = _v0.a;
+		var after = _v0.b;
+		return _Utils_ap(before, after);
 	});
 var $author$project$Main$deleteText = F2(
 	function (text, index) {
 		return _Utils_ap(
 			A2($elm$core$String$left, index - 1, text),
 			A2($elm$core$String$dropLeft, index, text));
-	});
-var $author$project$Main$endSelection = F2(
-	function (text, end) {
-		return ']' + A2($elm$core$String$dropLeft, end, text);
 	});
 var $elm$time$Time$Posix = function (a) {
 	return {$: 'Posix', a: a};
@@ -5833,15 +5833,6 @@ var $elm$file$File$Select$file = F2(
 			toMsg,
 			_File_uploadOne(mimes));
 	});
-var $elm$core$List$head = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(x);
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
 var $elm$core$Debug$log = _Debug_log;
 var $author$project$Main$verifyRange = F3(
 	function (min, max, value) {
@@ -5855,9 +5846,21 @@ var $author$project$Main$moveCursor = F2(
 			$elm$core$String$length(text) + (($elm$core$String$length(text) / 120) | 0),
 			pos);
 	});
-var $author$project$Main$startSelection = F2(
-	function (text, start) {
-		return A2($elm$core$String$left, start, text) + '[';
+var $elm$core$Basics$not = _Basics_not;
+var $author$project$Main$replaceSelectedText = F4(
+	function (start, end, ch, text) {
+		var _v0 = _Utils_Tuple2(
+			A3($elm$core$String$slice, 0, start, text),
+			A3(
+				$elm$core$String$slice,
+				end,
+				$elm$core$String$length(text),
+				text));
+		var before = _v0.a;
+		var after = _v0.b;
+		return _Utils_ap(
+			before,
+			_Utils_ap(ch, after));
 	});
 var $elm$file$File$Download$string = F3(
 	function (name, mime, content) {
@@ -5865,28 +5868,6 @@ var $elm$file$File$Download$string = F3(
 			$elm$core$Task$perform,
 			$elm$core$Basics$never,
 			A3(_File_download, name, mime, content));
-	});
-var $elm$core$Basics$ge = _Utils_ge;
-var $author$project$Main$switchCharacters = F2(
-	function (index, input) {
-		if ((index >= 0) && (_Utils_cmp(
-			index,
-			$elm$core$String$length(input) - 1) < 0)) {
-			var charAtNextIndex = A3($elm$core$String$slice, index + 1, index + 2, input);
-			var charAtIndex = A3($elm$core$String$slice, index, index + 1, input);
-			var _v0 = _Utils_Tuple2(charAtIndex, charAtNextIndex);
-			var char1 = _v0.a;
-			var char2 = _v0.b;
-			var beforeIndex = A2($elm$core$String$left, index, input);
-			var afterIndex = A2($elm$core$String$dropLeft, index + 2, input);
-			return _Utils_ap(
-				beforeIndex,
-				_Utils_ap(
-					char2,
-					_Utils_ap(char1, afterIndex)));
-		} else {
-			return input;
-		}
 	});
 var $elm$file$File$toString = _File_toString;
 var $elm$core$String$toUpper = _String_toUpper;
@@ -6050,6 +6031,7 @@ var $ohanhi$keyboard$Keyboard$Hyper = {$: 'Hyper'};
 var $ohanhi$keyboard$Keyboard$Meta = {$: 'Meta'};
 var $ohanhi$keyboard$Keyboard$NumLock = {$: 'NumLock'};
 var $ohanhi$keyboard$Keyboard$ScrollLock = {$: 'ScrollLock'};
+var $ohanhi$keyboard$Keyboard$Shift = {$: 'Shift'};
 var $ohanhi$keyboard$Keyboard$Super = {$: 'Super'};
 var $ohanhi$keyboard$Keyboard$Symbol = {$: 'Symbol'};
 var $ohanhi$keyboard$Keyboard$SymbolLock = {$: 'SymbolLock'};
@@ -6373,65 +6355,79 @@ var $author$project$Main$update = F2(
 		switch (msg.$) {
 			case 'Key':
 				var keyMsg = msg.a;
-				if (_Utils_eq(
-					$elm$core$List$head(
-						$elm$core$List$reverse(model.keys)),
-					$elm$core$Maybe$Just($ohanhi$keyboard$Keyboard$Shift))) {
-					var updatedModel = function () {
-						var start = model.cursorPos;
-						var right = A2(
-							$author$project$Main$endSelection,
-							model.text,
-							A2($author$project$Main$moveCursor, model.text, 1));
-						var left = A2($author$project$Main$startSelection, model.text, start);
-						var k = A2($ohanhi$keyboard$Keyboard$update, keyMsg, _List_Nil);
-						var end = model.cursorPos + 1;
-						_v1$2:
-						while (true) {
-							if (k.b) {
-								switch (k.a.$) {
-									case 'ArrowRight':
-										var _v2 = k.a;
-										var nRight = A2($author$project$Main$switchCharacters, end + 1, right);
-										return _Utils_update(
+				var k = A2($ohanhi$keyboard$Keyboard$update, keyMsg, _List_Nil);
+				if (model.shiftKey) {
+					_v1$5:
+					while (true) {
+						if (k.b && (!k.b.b)) {
+							switch (k.a.$) {
+								case 'ArrowRight':
+									var _v2 = k.a;
+									return _Utils_eq(model.selectionStart, model.selectionEnd) ? _Utils_Tuple2(
+										_Utils_update(
+											model,
+											{selectionEnd: model.cursorPos + 1, selectionStart: model.cursorPos}),
+										$elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+										_Utils_update(
+											model,
+											{selectionEnd: model.selectionEnd + 1}),
+										$elm$core$Platform$Cmd$none);
+								case 'ArrowLeft':
+									var _v3 = k.a;
+									return _Utils_eq(model.selectionStart, model.selectionEnd) ? _Utils_Tuple2(
+										_Utils_update(
+											model,
+											{selectionStart: model.cursorPos - 1}),
+										$elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+										_Utils_update(
+											model,
+											{selectionEnd: model.selectionEnd - 1}),
+										$elm$core$Platform$Cmd$none);
+								case 'Shift':
+									var _v4 = k.a;
+									return _Utils_Tuple2(
+										_Utils_update(
+											model,
+											{shiftKey: false}),
+										$elm$core$Platform$Cmd$none);
+								case 'Delete':
+									var _v5 = k.a;
+									return _Utils_Tuple2(
+										_Utils_update(
 											model,
 											{
-												text: _Utils_ap(left, nRight)
-											});
-									case 'Enter':
-										var _v3 = k.a;
-										return _Utils_update(
+												cursorPos: model.selectionStart,
+												shiftKey: false,
+												text: A3($author$project$Main$deleteSelectedText, model.selectionStart, model.selectionEnd, model.text)
+											}),
+										$elm$core$Platform$Cmd$none);
+								case 'Character':
+									var ch = k.a.a;
+									return _Utils_Tuple2(
+										_Utils_update(
 											model,
 											{
-												cursorPos: A2($author$project$Main$moveCursor, model.text, model.cursorPos + 120),
-												keys: A2($elm$core$List$append, model.keys, k),
-												select: false
-											});
-									default:
-										break _v1$2;
-								}
-							} else {
-								break _v1$2;
+												cursorPos: model.selectionStart + 1,
+												shiftKey: false,
+												text: A4($author$project$Main$replaceSelectedText, model.selectionStart, model.selectionEnd, ch, model.text)
+											}),
+										$elm$core$Platform$Cmd$none);
+								default:
+									break _v1$5;
 							}
+						} else {
+							break _v1$5;
 						}
-						return model;
-					}();
-					return _Utils_Tuple2(
-						_Utils_update(
-							updatedModel,
-							{
-								selected: A3($elm$core$String$slice, model.selectionStart, model.selectionEnd, model.text)
-							}),
-						$elm$core$Platform$Cmd$none);
+					}
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 				} else {
-					var k = A2($ohanhi$keyboard$Keyboard$update, keyMsg, _List_Nil);
-					_v4$10:
+					_v6$10:
 					while (true) {
 						if (k.b) {
 							if (!k.b.b) {
 								switch (k.a.$) {
 									case 'ArrowDown':
-										var _v5 = k.a;
+										var _v7 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6443,7 +6439,7 @@ var $author$project$Main$update = F2(
 													})),
 											$elm$core$Platform$Cmd$none);
 									case 'ArrowRight':
-										var _v6 = k.a;
+										var _v8 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6455,7 +6451,7 @@ var $author$project$Main$update = F2(
 													})),
 											$elm$core$Platform$Cmd$none);
 									case 'ArrowLeft':
-										var _v7 = k.a;
+										var _v9 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6467,7 +6463,7 @@ var $author$project$Main$update = F2(
 													})),
 											$elm$core$Platform$Cmd$none);
 									case 'ArrowUp':
-										var _v8 = k.a;
+										var _v10 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6479,16 +6475,14 @@ var $author$project$Main$update = F2(
 													})),
 											$elm$core$Platform$Cmd$none);
 									case 'Shift':
-										var _v9 = k.a;
+										var _v11 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
 												'Hi',
 												_Utils_update(
 													model,
-													{
-														keys: A2($elm$core$List$append, model.keys, k)
-													})),
+													{shiftKey: !model.shiftKey})),
 											$elm$core$Platform$Cmd$none);
 									case 'Character':
 										var ch = k.a.a;
@@ -6502,13 +6496,12 @@ var $author$project$Main$update = F2(
 															m,
 															{
 																cursorPos: A2($author$project$Main$updateCursor, m.text, m.cursorPos),
-																keys: A2($elm$core$List$append, model.keys, k),
 																text: A3($author$project$Main$writeFrom, m.text, ch, m.cursorPos)
 															});
 													}(model))),
 											$elm$core$Platform$Cmd$none);
 									case 'Spacebar':
-										var _v10 = k.a;
+										var _v12 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6519,13 +6512,12 @@ var $author$project$Main$update = F2(
 															m,
 															{
 																cursorPos: A2($author$project$Main$updateCursor, m.text, m.cursorPos),
-																keys: A2($elm$core$List$append, model.keys, k),
 																text: A3($author$project$Main$writeFrom, m.text, ' ', m.cursorPos)
 															});
 													}(model))),
 											$elm$core$Platform$Cmd$none);
 									case 'Backspace':
-										var _v11 = k.a;
+										var _v13 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6538,7 +6530,7 @@ var $author$project$Main$update = F2(
 													})),
 											$elm$core$Platform$Cmd$none);
 									case 'Enter':
-										var _v12 = k.a;
+										var _v14 = k.a;
 										return _Utils_Tuple2(
 											A2(
 												$elm$core$Debug$log,
@@ -6555,10 +6547,10 @@ var $author$project$Main$update = F2(
 													}(model))),
 											$elm$core$Platform$Cmd$none);
 									default:
-										break _v4$10;
+										break _v6$10;
 								}
 							} else {
-								break _v4$10;
+								break _v6$10;
 							}
 						} else {
 							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -6634,7 +6626,7 @@ var $author$project$Main$formatText = function (model) {
 		_Utils_Tuple2('', 0),
 		model.text);
 	var formatted = lines.a;
-	return $author$project$Main$insertCursor(formatted)(model.cursorPos);
+	return (model.shiftKey && (_Utils_cmp(model.selectionStart, model.selectionEnd) < 0)) ? (A2($elm$core$String$left, model.selectionStart, formatted) + ('[' + (A3($elm$core$String$slice, model.selectionStart, model.selectionEnd, formatted) + (']' + A2($elm$core$String$dropLeft, model.selectionEnd, formatted))))) : $author$project$Main$insertCursor(formatted)(model.cursorPos);
 };
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
 	return {$: 'Normal', a: a};
