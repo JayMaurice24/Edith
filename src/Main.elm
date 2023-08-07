@@ -22,12 +22,10 @@ type alias Model =
     { text : String
     , cursorPos : Int
     , lineNum : Int
-    , select: Bool 
     , lineNums: List Int
     , selectionEnd : Int
     , shiftKey : Bool  
     , selectionStart : Int
-    , selected : String 
     , keys : List Key
     , csv : Maybe String
     }
@@ -38,8 +36,6 @@ init _ =
     , cursorPos = 0
     , lineNums = []
     , lineNum = 1 
-    , selected = ""
-    , select = False
     , keys = []
     , shiftKey = False
     , selectionEnd = 0
@@ -53,17 +49,6 @@ type Msg
     | CsvSelected File
     | CsvLoaded String
     | Download 
-{-
-    | SelectText Int
-    | DeleteSelectedText
-    | ReplaceSelectedText String-}
-
-type CursorDirection
-    = Left
-    | Right
-    | Up
-    | Down
-    | None
 
 update: Msg -> Model -> (Model, Cmd Msg)
 update msg model = 
